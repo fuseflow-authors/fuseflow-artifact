@@ -1,0 +1,9 @@
+[submodule "samml"]
+	path = samml
+	url = https://github.com/fuseflow-authors/fuseflow-compiler.git
+[submodule "tortilla-visualizer"]
+	path = tortilla-visualizer
+	url = https://github.com/fuseflow-authors/tortilla-visualizer.git
+[submodule "comal"]
+	path = comal
+	url = https://github.com/fuseflow-authors/comal.git

@@ -1,0 +1,60 @@
+# Git metadata (but keep submodules content)
+**/.git
+
+# Build artifacts (will be rebuilt in container)
+samml/build/
+samml/external/llvm-project/build/
+samml/external/or-tools/build/
+comal/target/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Compiled objects
+**/*.so
+**/*.o
+**/*.a
+
+# Virtual environments
+*-venv/
+venv/
+.venv/
+fuseflow-venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Results and logs (user should mount these)
+results/
+figure*.json
+figure*.pdf
+*.log
+
+# Temporary files
+.cache/
+*.tmp
+
+# Data directories (generated at runtime)
+/data/
+DBLP/
+PubMed/
+cora/
+citeseer/
+dblp/
+ogbn-*/
+
+# Test output files
+*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+backup*/
+*.bak

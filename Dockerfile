@@ -1,0 +1,168 @@
+# FuseFlow Artifact Docker Image
+#
+# Build: docker build -t fuseflow-artifact .
+# Run:   docker run -it --rm fuseflow-artifact
+#
+# For artifact evaluation with result persistence:
+#   docker run -it --rm -v $(pwd)/results:/fuseflow-artifact/results fuseflow-artifact
+
+FROM ubuntu:22.04
+
+LABEL maintainer="anonymous"
+LABEL description="FuseFlow: A Fusion-centric Compilation Framework for Sparse Deep Learning"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# ============================================================================
+# Stage 1: Install system dependencies
+# ============================================================================
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    ninja-build \
+    clang \
+    lld \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    graphviz \
+    git \
+    curl \
+    wget \
+    unzip \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CMake 3.28 (required by SAMML)
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.sh -O /tmp/cmake-install.sh && \
+    chmod +x /tmp/cmake-install.sh && \
+    /tmp/cmake-install.sh --skip-license --prefix=/usr/local && \
+    rm /tmp/cmake-install.sh
+
+# ============================================================================
+# Stage 2: Install Rust
+# ============================================================================
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+# ============================================================================
+# Stage 3: Install Protocol Buffers compiler v24.0
+# ============================================================================
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.0/protoc-24.0-linux-x86_64.zip \
+    && unzip protoc-24.0-linux-x86_64.zip -d /usr/local \
+    && rm protoc-24.0-linux-x86_64.zip
+
+# ============================================================================
+# Stage 4: Setup working directory and copy source
+# ============================================================================
+WORKDIR /fuseflow-artifact
+
+# Copy the artifact source code
+COPY . .
+
+# ============================================================================
+# Stage 5: Setup Python virtual environment
+# ============================================================================
+RUN python3 -m venv /opt/fuseflow-venv
+ENV PATH="/opt/fuseflow-venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/fuseflow-venv"
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install -r samml/requirements.txt && \
+    pip install -r sam/requirements.txt && \
+    pip install -r tortilla-visualizer/requirement.txt && \
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install torch_geometric maturin networkx tqdm pandas scipy matplotlib && \
+    pip install -e sam/
+
+# ============================================================================
+# Stage 6: Build LLVM/MLIR (this takes a long time)
+# ============================================================================
+RUN cd samml/external/llvm-project && \
+    mkdir -p build && cd build && \
+    cmake -G Ninja ../llvm \
+        -DLLVM_ENABLE_PROJECTS=mlir \
+        -DLLVM_TARGETS_TO_BUILD="Native" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_USE_SPLIT_DWARF=ON \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DLLVM_ENABLE_LLD=ON && \
+    ninja MLIRMlirOptMain && \
+    ninja check-mlir
+
+# ============================================================================
+# Stage 7: Build and Install OR-Tools
+# ============================================================================
+RUN cd samml/external && \
+    if [ ! -d "or-tools" ]; then \
+        git clone --depth 1 https://github.com/google/or-tools.git; \
+    fi && \
+    cd or-tools && \
+    mkdir -p build && cd build && \
+    cmake -S .. -B . \
+        -DBUILD_DEPS=ON \
+        -DUSE_SCIP=OFF \
+        -DUSE_HIGHS=OFF \
+        -DUSE_COINOR=OFF && \
+    cmake --build . --config Release --target all -j$(nproc) && \
+    cmake --build . --config Release --target install -v
+
+# ============================================================================
+# Stage 8: Build SAMML compiler
+# ============================================================================
+RUN cd samml && \
+    mkdir -p build && cd build && \
+    cmake -G Ninja .. -DLLVM_EXTERNAL_LIT=$(which lit) && \
+    ninja
+
+# ============================================================================
+# Stage 9: Build Comal simulator
+# ============================================================================
+RUN cd comal && \
+    maturin develop --release
+
+# ============================================================================
+# Stage 10: Create results directory and set permissions
+# ============================================================================
+RUN mkdir -p /fuseflow-artifact/results && \
+    chmod -R 755 /fuseflow-artifact
+
+# Set environment variables for runtime
+ENV DATA_PATH=/tmp/data
+ENV PYTHONPATH="/fuseflow-artifact:${PYTHONPATH}"
+
+# ============================================================================
+# Default command: interactive shell
+# ============================================================================
+WORKDIR /fuseflow-artifact
+
+# Verification script
+RUN echo '#!/bin/bash\n\
+echo "=== FuseFlow Artifact Environment ==="\n\
+echo ""\n\
+echo "Verifying installation..."\n\
+python3 -c "import comal; print(\"✓ Comal OK\")"\n\
+python3 -c "import sam; print(\"✓ SAM OK\")"\n\
+./samml/build/tools/sam-opt --version > /dev/null 2>&1 && echo "✓ SAMML compiler OK"\n\
+echo ""\n\
+echo "Quick start commands:"\n\
+echo "  # Run GCN benchmark on Cora (fast mode)"\n\
+echo "  python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora --mode fast"\n\
+echo ""\n\
+echo "  # Run all Figure 12 benchmarks"\n\
+echo "  python3 scripts/run_figure12_benchmarks.py --mode full"\n\
+echo ""\n\
+echo "  # Generate plots"\n\
+echo "  python3 scripts/plot_figure12.py --input figure12_results.json --output results/figure12.pdf"\n\
+echo ""' > /usr/local/bin/fuseflow-info && chmod +x /usr/local/bin/fuseflow-info
+
+CMD ["/bin/bash", "-c", "fuseflow-info && exec /bin/bash"]
