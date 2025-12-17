@@ -21,9 +21,9 @@ mkdir -p results
 # Figure 12 - Main performance comparison (SAE, GCN, GraphSAGE, GPT-3)
 echo "========================================"
 echo "Running Figure 12: Performance Comparison"
-echo "Estimated time: ~96 compute-hours (medium mode, 2 workers)"
+echo "Estimated time: up to ~96 compute-hours (medium mode, 4 workers)"
 echo "========================================"
-python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 
+python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 --no-hbm
 echo "Generating Figure 12 plot..."
 python3 scripts/plot_figure12.py --input figure12_results.json --output results/figure12.pdf
 echo "✓ Figure 12 complete: results/figure12.pdf"

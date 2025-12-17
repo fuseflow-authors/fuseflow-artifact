@@ -67,7 +67,7 @@ We provide scripts to generate all of the results within the container.
 - Within the Docker container, run the following commands to generate all results:
   ```
   # Figure 12 - Main performance comparison (SAE, GCN, GraphSAGE, GPT-3)
-  python3 scripts/run_figure12_benchmarks.py --mode full
+  python3 scripts/run_figure12_benchmarks.py --mode complete
 
   # Figure 14 - GCN FLOPs and memory metrics
   python3 scripts/process_figure14_metrics.py
@@ -86,8 +86,41 @@ We provide scripts to generate all of the results within the container.
   ```
 - Once this completes, you can extract the figures from the Docker container by following the instructions in the section [Validate All Results](#validate-all-results) in this README.
 
-## Run Figure 12: Performance Comparison (5 human-minutes + up to 48 compute-hours)
+## Run Figure 12: Performance Comparison (5 human-minutes + 96 compute-hours)
 Figure 12 compares performance across four model architectures (SAE, GCN, GraphSAGE, GPT-3).
+
+### Artifact Configuration for Figure 12
+
+**Default Configuration (Medium Mode, No HBM):**
+By default, the artifact runs Figure 12 in `medium` mode with HBM simulation disabled (`--no-hbm`) to validate the fusion performance trends shown in the paper while keeping evaluation time practical (~96 compute-hours). This configuration:
+
+- Runs all datasets for all models
+- Skips the `fully_fused` configuration only for the largest datasets (GCN MAG, GraphSAGE Collab/MAG), since `fully_fused` is shown to be inefficient overall for GCN and GraphSAGE across all datasets
+- Disables HBM memory simulation to reduce total runtime from weeks to days
+
+**Parallel Execution:**
+The Figure 12 benchmark script supports parallel execution of simulation jobs using the `--workers` flag. By default, the artifact runs with 4 parallel workers (requires peak ~64GB memory). Users can increase the number of workers to speed up total simulation time, depending on available memory:
+
+To modify the worker count, edit the `--workers`/`-w` parameter in [scripts/run_all_benchmarks.sh](scripts/run_all_benchmarks.sh#L26) or specify it when running manually:
+```bash
+python3 scripts/run_figure12_benchmarks.py --mode medium --workers 8 --no-hbm
+```
+
+**HBM Simulation:**
+HBM simulation is disabled by default to keep artifact evaluation time reasonable. Enabling HBM increases total runtime to over a week due to detailed memory simulation overhead. Disabling HBM affects **absolute latency values** but preserves **qualitative fusion trends** (relative ordering of unfused, partially fused, and fully fused configurations), since these trends are primarily driven by fusion-induced changes in intermediate materialization, recomputation, and coordinate processing rather than peak off-chip bandwidth.
+
+Reviewers who wish to reproduce the paper's HBM-backed results may enable it by removing the `--no-hbm` flag in [scripts/run_all_benchmarks.sh](scripts/run_all_benchmarks.sh#L26).
+
+**Benchmark Modes:**
+The Figure 12 sweep script supports three modes with different dataset coverage:
+
+| Mode | SAE Datasets | GCN Datasets | GraphSAGE Datasets | GPT-3 Block Sizes | Notes |
+|------|--------------|--------------|--------------------|--------------------|-------|
+| `fast` | All 3 (ImageNet, NIH-CXR, LUNA16) | 3 smaller (Cora, Cora-ML, DBLP) | 3 smaller (Cora, Cora-ML, DBLP) | All 3 (16, 32, 64) | Quick testing (~1 compute-hour) |
+| `medium` | All 3 (ImageNet, NIH-CXR, LUNA16) | All 5 (Cora, Cora-ML, DBLP, Collab, MAG) | All 5 (Cora, Cora-ML, DBLP, Collab, MAG) | All 3 (16, 32, 64) | **Default for artifact** (~96 compute-hours). Skips `fully_fused` for MAG (GCN) and Collab/MAG (GraphSAGE) |
+| `complete` | All 3 (ImageNet, NIH-CXR, LUNA16) | All 5 with all fusion types | All 5 with all fusion types | All 3 (16, 32, 64) | Full paper results (>1 week). Runs `fully_fused` on large datasets |
+
+The `medium` mode skips the `fully_fused` configuration for the largest GCN and GraphSAGE datasets (which are shown to be inefficient overall) to avoid long-running experiments that would add over a week of simulation time. We only run the experiments that complete in a reasonable time while still validating the key fusion performance trends.
 
 **Models evaluated:**
 | Model | Datasets/Configs |
@@ -104,21 +137,21 @@ Choose one of the following options to run:
    python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora --mode fast
    ```
 
-2. Run `--mode full` to run the full set of benchmarks that will take 48 compute-hours:
+2. Run `--mode complete` to run the full set of benchmarks that will take over a week:
    ```
-   python3 scripts/run_figure12_benchmarks.py --mode full
+   python3 scripts/run_figure12_benchmarks.py --mode complete
    ```
 
 3. Run specific models or datasets:
    ```
    # Run only GCN on specific datasets
-   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora cora_ml dblp --mode full
+   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora cora_ml dblp
 
    # Run only SAE benchmarks
-   python3 scripts/run_figure12_benchmarks.py --model sae --mode full
+   python3 scripts/run_figure12_benchmarks.py --model sae
 
    # Run only GPT-3 BigBird benchmarks
-   python3 scripts/run_figure12_benchmarks.py --model gpt3 --mode full
+   python3 scripts/run_figure12_benchmarks.py --model gpt3
    ```
 
 - The script generates a `figure12_results.json` file with cycle counts for each configuration.
@@ -128,7 +161,7 @@ Choose one of the following options to run:
   python3 scripts/plot_figure12.py --input figure12_results.json --output results/figure12.pdf
   ```
 
-## Run Figure 14: GCN FLOPs and Memory Analysis (5 human-minutes + 30 compute-minutes)
+## Run Figure 14: GCN FLOPs and Memory Analysis (5 human-minutes + 5 compute-minutes)
 Figure 14 analyzes computational efficiency and memory access patterns for GCN.
 
 - Run the following commands:
@@ -143,7 +176,7 @@ Figure 14 analyzes computational efficiency and memory access patterns for GCN.
   ```
   - The script will create a plot at the location `/fuseflow-artifact/results/figure14.pdf`.
 
-## Run Figure 15a: Sparsity Sweep (5 human-minutes + 12 compute-hours)
+## Run Figure 15a: Sparsity Sweep (5 human-minutes + 1 compute-hour)
 Figure 15a shows how performance varies with different sparsity levels.
 
 - Run the sparsity sweep script:
@@ -158,7 +191,7 @@ Figure 15a shows how performance varies with different sparsity levels.
   ```
   - The script will create a plot at the location `/fuseflow-artifact/results/figure15a.pdf`.
 
-## Run Figure 15b: Parallelism Sweep (5 human-minutes + 24 compute-hours)
+## Run Figure 15b: Parallelism Sweep (5 human-minutes + 10 compute-minutes)
 Figure 15b shows how performance scales with different parallelization factors.
 
 - Run the parallelism sweep script:
@@ -173,7 +206,7 @@ Figure 15b shows how performance scales with different parallelization factors.
   ```
   - The script will create a plot at the location `/fuseflow-artifact/results/figure15b.pdf`.
 
-## Run Figure 16: Block Size Comparison (5 human-minutes + 12 compute-hours)
+## Run Figure 16: Block Size Comparison (5 human-minutes + 30 compute-minutes)
 Figure 16 compares performance across different block sizes.
 
 - Run the block size comparison script:
@@ -188,7 +221,7 @@ Figure 16 compares performance across different block sizes.
   ```
   - The script will create a plot at the location `/fuseflow-artifact/results/figure16.pdf`.
 
-## Run Figure 17: Dataflow Order Sweep (5 human-minutes + 12 compute-hours)
+## Run Figure 17: Dataflow Order Sweep (5 human-minutes + 5 compute-minutes)
 Figure 17 evaluates different dataflow ordering strategies.
 
 - Run the dataflow order sweep script:
