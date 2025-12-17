@@ -11,14 +11,14 @@ FROM ubuntu:22.04
 LABEL maintainer="anonymous"
 LABEL description="FuseFlow: A Fusion-centric Compilation Framework for Sparse Deep Learning"
 
-# Prevent interactive prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
+# Set timezone
 ENV TZ=UTC
 
 # ============================================================================
 # Stage 1: Install system dependencies
 # ============================================================================
-RUN apt-get update && apt-get install -y \
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    apt-get update && apt-get install -y \
     build-essential \
     ninja-build \
     clang \
@@ -59,31 +59,15 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.0/pro
     && rm protoc-24.0-linux-x86_64.zip
 
 # ============================================================================
-# Stage 4: Setup working directory and copy source
+# Stage 4: Copy LLVM source ONLY (for maximum cache efficiency)
 # ============================================================================
+# NOTE: LLVM build is the slowest step (~30+ min). By copying only LLVM source
+# first, this layer is cached unless LLVM source itself changes.
 WORKDIR /fuseflow-artifact
-
-# Copy the artifact source code
-COPY . .
+COPY samml/external/llvm-project samml/external/llvm-project
 
 # ============================================================================
-# Stage 5: Setup Python virtual environment
-# ============================================================================
-RUN python3 -m venv /opt/fuseflow-venv
-ENV PATH="/opt/fuseflow-venv/bin:$PATH"
-ENV VIRTUAL_ENV="/opt/fuseflow-venv"
-
-# Install Python dependencies
-RUN pip install --upgrade pip && \
-    pip install -r samml/requirements.txt && \
-    pip install -r sam/requirements.txt && \
-    pip install -r tortilla-visualizer/requirement.txt && \
-    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install torch_geometric maturin networkx tqdm pandas scipy matplotlib && \
-    pip install -e sam/
-
-# ============================================================================
-# Stage 6: Build LLVM/MLIR (this takes a long time)
+# Stage 5: Build LLVM/MLIR (this takes a long time - cache this!)
 # ============================================================================
 RUN cd samml/external/llvm-project && \
     mkdir -p build && cd build && \
@@ -100,13 +84,10 @@ RUN cd samml/external/llvm-project && \
     ninja check-mlir
 
 # ============================================================================
-# Stage 7: Build and Install OR-Tools
+# Stage 6: Copy OR-Tools source and build
 # ============================================================================
-RUN cd samml/external && \
-    if [ ! -d "or-tools" ]; then \
-        git clone --depth 1 https://github.com/google/or-tools.git; \
-    fi && \
-    cd or-tools && \
+COPY samml/external/or-tools samml/external/or-tools
+RUN cd samml/external/or-tools && \
     mkdir -p build && cd build && \
     cmake -S .. -B . \
         -DBUILD_DEPS=ON \
@@ -117,7 +98,35 @@ RUN cd samml/external && \
     cmake --build . --config Release --target install -v
 
 # ============================================================================
-# Stage 8: Build SAMML compiler
+# Stage 7: Copy dependency files and install Python dependencies
+# ============================================================================
+COPY samml/requirements.txt samml/requirements.txt
+COPY sam/requirements.txt sam/requirements.txt
+COPY tortilla-visualizer/requirement.txt tortilla-visualizer/requirement.txt
+
+RUN python3 -m venv /opt/fuseflow-venv
+ENV PATH="/opt/fuseflow-venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/fuseflow-venv"
+
+RUN pip install --upgrade pip && \
+    pip install -r samml/requirements.txt && \
+    pip install -r sam/requirements.txt && \
+    pip install -r tortilla-visualizer/requirement.txt && \
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install torch_geometric networkx tqdm pandas scipy matplotlib && \
+    pip install -U "maturin[patchelf]" && \
+    pip install ogb
+
+# ============================================================================
+# Stage 8: Copy remaining source code
+# ============================================================================
+COPY . .
+
+# Install SAM in editable mode (needs full source)
+RUN pip install -e sam/
+
+# ============================================================================
+# Stage 9: Build SAMML compiler
 # ============================================================================
 RUN cd samml && \
     mkdir -p build && cd build && \
@@ -125,13 +134,19 @@ RUN cd samml && \
     ninja
 
 # ============================================================================
-# Stage 9: Build Comal simulator
+# Stage 10: Build Comal simulator
 # ============================================================================
 RUN cd comal && \
     maturin develop --release
 
 # ============================================================================
-# Stage 10: Create results directory and set permissions
+# Stage 11: Build Tortilla visualizer
+# ============================================================================
+RUN cd tortilla-visualizer && \
+    make
+
+# ============================================================================
+# Stage 12: Create results directory and set permissions
 # ============================================================================
 RUN mkdir -p /fuseflow-artifact/results && \
     chmod -R 755 /fuseflow-artifact
@@ -165,4 +180,5 @@ echo "  # Generate plots"\n\
 echo "  python3 scripts/plot_figure12.py --input figure12_results.json --output results/figure12.pdf"\n\
 echo ""' > /usr/local/bin/fuseflow-info && chmod +x /usr/local/bin/fuseflow-info
 
-CMD ["/bin/bash", "-c", "fuseflow-info && exec /bin/bash"]
+CMD ["fuseflow-info && /bin/bash"]
+ENTRYPOINT ["/bin/bash", "-c"]

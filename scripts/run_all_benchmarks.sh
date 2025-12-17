@@ -23,7 +23,7 @@ echo "========================================"
 echo "Running Figure 12: Performance Comparison"
 echo "Estimated time: ~96 compute-hours (medium mode, 2 workers)"
 echo "========================================"
-python3 scripts/run_figure12_benchmarks.py --mode medium --workers 2
+python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 
 echo "Generating Figure 12 plot..."
 python3 scripts/plot_figure12.py --input figure12_results.json --output results/figure12.pdf
 echo "✓ Figure 12 complete: results/figure12.pdf"

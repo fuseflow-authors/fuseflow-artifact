@@ -768,14 +768,14 @@ class one_layer_graphsage:
         self.linears_per_layer = 2
         self.weights = []
         self.biases = []
-    
+
     def _prep_dataset(self):
         self.root_dir = os.environ["DATA_PATH"]
         self.data, num_classes = load_dataset_memory_efficient(self.dataset_name, self.root_dir, self.name)
         self.in_channels = self.data.num_features
         self.out_channels = num_classes
 
-    def gen_data(self, tensor_name, input_args, mode_info, shape=None):        
+    def gen_data(self, tensor_name, input_args, mode_info, shape=None):
         if input_args < self.input_args:
             x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name)
             if input_args == 0:
@@ -785,8 +785,8 @@ class one_layer_graphsage:
                 dump_data(tensor_name, adjacency, os.getcwd() + self.file_path)
                 return adjacency[0]
         else:
-            raise NotImplementedError 
-    
+            raise NotImplementedError
+
     def collect_names(self, tensor_name, input_arg, mode, shape=None, format=None):
         if input_arg == 0:
             self.xname = tensor_name
@@ -798,12 +798,12 @@ class one_layer_graphsage:
         elif len(mode) == 2:
             self.weight.append(tensor_name)
             self.sh2.append(shape)
-    
+
     def generate_data(self):
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
-        # print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
+        # print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency.get_shape()}")
         x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.in_channels, self.hidden_channels)] #, (self.hidden_channels, self.out_channels)]
@@ -3581,10 +3581,9 @@ class gcn_adj_x1:
     
     def generate_data(self):
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
-        print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
+        print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency.get_shape()}")
         x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
-        # adjacency.dump_outputs("CSF")
+        adjacency.dump_outputs("CSF")
         # weight_names = self.weight
         # bias_names = self.bias
         # linear_shapes = [(self.in_channels, self.hidden_channels), (self.hidden_channels, self.out_channels)]
@@ -3839,10 +3838,9 @@ class gcn_adj_x2:
     
     def generate_data(self):
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
-        print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
+        print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency.get_shape()}")
         # x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
-        # adjacency.dump_outputs("CSF")
+        adjacency.dump_outputs("CSF")
         linear_out = MatrixGenerator(self.xname, (x.shape[0], self.hidden_channels), [0, 1], dump_dir=os.getcwd() + self.file_path, format="UNC")
         print(linear_out.get_shape())
         linear_out.dump_outputs("UNC")

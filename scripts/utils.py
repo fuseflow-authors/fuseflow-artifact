@@ -3,11 +3,9 @@ from pathlib import Path
 #import scorch
 import re
 
-PROJECT_ROOT_DIR = Path(__file__)
-while not (PROJECT_ROOT_DIR / "samml-artifact").exists():
-    PROJECT_ROOT_DIR = PROJECT_ROOT_DIR.parent
-ARTIFACT_ROOT = PROJECT_ROOT_DIR / "samml-artifact"
-PROJECT_ROOT = PROJECT_ROOT_DIR / "samml-artifact" / "samml"
+PROJECT_ROOT_DIR = Path("/fuseflow-artifact")
+ARTIFACT_ROOT = PROJECT_ROOT_DIR
+PROJECT_ROOT = PROJECT_ROOT_DIR / "samml"
 
 
 def run_command_list(command_list, cwd=None, debug=True):

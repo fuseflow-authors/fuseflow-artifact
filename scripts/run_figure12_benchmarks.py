@@ -578,8 +578,10 @@ def get_data_dir_for_job(job):
     mlir_path = Path(job.mlir_file)
     test_type = mlir_path.parent.name
     test_name = mlir_path.stem
-    block_size = job.block_size if job.block_size else 64  # Default block size
-    data_test_name = f"{test_name}_b{block_size}"
+
+    # Always add block size suffix
+    data_test_name = f"{test_name}_b{job.block_size}"
+
     return ARTIFACT_ROOT / "data" / test_type / data_test_name
 
 
@@ -831,8 +833,11 @@ def run_gcn_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, o
         ds_name = config['dataset_name']
 
         # 1. Fully Fused
+        # Skip fully_fused for ogbn-mag (too large for medium mode)
+        skip_fully_fused = dataset == 'mag'
+
         fused_mlir = models_dir / config['fused_mlir']
-        if fused_mlir.exists():
+        if fused_mlir.exists() and not skip_fully_fused:
             jobs.append(BenchmarkJob(
                 job_id=job_id, mlir_file=fused_mlir, sparsity=sparsity,
                 build_dir=build_dir, parfactor=parfactor, timeout=timeout,
@@ -945,8 +950,11 @@ def run_graphsage_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=N
         ds_name = config['dataset_name']
 
         # 1. Fully Fused
+        # Skip fully_fused for ogbl-collab and ogbn-mag (too large for medium mode)
+        skip_fully_fused = dataset in ['collab', 'mag']
+
         fused_mlir = models_dir / config['fused_mlir']
-        if fused_mlir.exists():
+        if fused_mlir.exists() and not skip_fully_fused:
             jobs.append(BenchmarkJob(
                 job_id=job_id, mlir_file=fused_mlir, sparsity=sparsity,
                 build_dir=build_dir, parfactor=parfactor, timeout=timeout,
@@ -1459,8 +1467,8 @@ def main():
     parser.add_argument('--mode', type=str, choices=['fast', 'medium', 'complete'],
                         help='Preset benchmark mode:\n'
                              '  fast: All SAE, GCN/GraphSAGE with cora/cora_ml/dblp, all GPT-3 blocks\n'
-                             '  medium: Fast + collab for GCN\n'
-                             '  complete: Medium + mag for GCN, collab/mag for GraphSAGE')
+                             '  medium: All datasets, skips fully_fused for large graphs (GCN mag, GraphSAGE collab/mag)\n'
+                             '  complete: All datasets with all fusion types')
 
     # HBM simulation toggle
     parser.add_argument('--hbm', action='store_true', default=True,
@@ -1490,8 +1498,8 @@ def main():
             },
             'medium': {
                 'sae_datasets': ['imagenet', 'nih', 'luna16'],
-                'gcn_datasets': ['cora', 'cora_ml', 'dblp', 'collab'],
-                'graphsage_datasets': ['cora', 'cora_ml', 'dblp'],
+                'gcn_datasets': ['cora', 'cora_ml', 'dblp', 'collab', 'mag'],
+                'graphsage_datasets': ['cora', 'cora_ml', 'dblp', 'collab', 'mag'],
                 'gpt3_blocks': ['16', '32', '64'],
             },
             'complete': {
@@ -1548,9 +1556,7 @@ def main():
         print(f"GraphSAGE datasets: {', '.join(args.graphsage_datasets)}")
     if args.gpt3_blocks:
         print(f"GPT-3 blocks: {', '.join(args.gpt3_blocks)}")
-    print(f"HBM simulation: {'ENABLED' if args.hbm else 'DISABLED'}")
     print(f"Parallel workers: {args.workers}")
-    print(f"Data cleanup: {'DISABLED' if args.no_cleanup else 'ENABLED (saves disk space)'}")
     print("="*100)
 
     all_results = {}

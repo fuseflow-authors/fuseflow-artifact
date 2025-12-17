@@ -45,9 +45,9 @@ def get_argparser():
                                                                 'If not set, will use build/ in ARTIFACT_HOME/samml')
     parser.add_argument('-d', '--debug', action='store_true', default=False,
                         help='Print out more information if in debug mode')
-    parser.add_argument('-inDataset', type=str, default="",
+    parser.add_argument('--inDataset', '-inDataset', type=str, default="",
                         help='DatasetName set')
-    parser.add_argument('-inData', type=str, default="",
+    parser.add_argument('--inData', '-inData', type=str, default="",
                         help='data name')
     parser.add_argument('--useGen', type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help='Use generator')
