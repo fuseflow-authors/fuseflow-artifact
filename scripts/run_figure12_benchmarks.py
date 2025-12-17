@@ -30,6 +30,10 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 
+# Fix for PyTorch 2.6+ weights_only default change
+# This allows PyTorch Geometric datasets to load without issues
+os.environ.setdefault('TORCH_WEIGHTS_ONLY_LOAD', '0')
+
 # Add the scripts directory to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 ARTIFACT_ROOT = SCRIPT_DIR.parent

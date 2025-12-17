@@ -99,11 +99,11 @@ By default, the artifact runs Figure 12 in `medium` mode with HBM simulation dis
 - Disables HBM memory simulation to reduce total runtime from weeks to days
 
 **Parallel Execution:**
-The Figure 12 benchmark script supports parallel execution of simulation jobs using the `--workers` flag. By default, the artifact runs with 4 parallel workers (requires peak ~64GB memory). Users can increase the number of workers to speed up total simulation time, depending on available memory:
+The Figure 12 benchmark script supports parallel execution of simulation jobs using the `--workers` flag. By default, the artifact runs with 4 parallel workers (requires peak ~140GB memory). Users can adjust the number of workers to balance speed vs. memory usage:
 
 To modify the worker count, edit the `--workers`/`-w` parameter in [scripts/run_all_benchmarks.sh](scripts/run_all_benchmarks.sh#L26) or specify it when running manually:
 ```bash
-python3 scripts/run_figure12_benchmarks.py --mode medium --workers 8 --no-hbm
+python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 --no-hbm
 ```
 
 **HBM Simulation:**

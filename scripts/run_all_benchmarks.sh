@@ -4,6 +4,9 @@
 
 set -e  # Exit on error
 
+# Fix for PyTorch 2.6+ weights_only default change
+export TORCH_WEIGHTS_ONLY_LOAD=0
+
 echo "========================================"
 echo "FuseFlow Artifact - Running All Benchmarks"
 echo "========================================"

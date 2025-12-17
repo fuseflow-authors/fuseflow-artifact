@@ -1891,8 +1891,7 @@ class gcn_sparse:
         x.dump_outputs("UNC")
         print(self.xname)
         print(self.adjname)
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
-        # adjacency.dump_outputs("CSF")
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.in_channels, self.hidden_channels), (self.hidden_channels, self.out_channels)]
@@ -2007,8 +2006,7 @@ class one_layer_gcn:
         print(self.adjmode)
         print(self.weightmode)
         # exit(0)
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
-        # adjacency.dump_outputs("CSF")
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.in_channels, self.hidden_channels)] #, (self.hidden_channels, self.out_channels)]
@@ -3307,7 +3305,7 @@ class gcn_fused_across:
         x.dump_outputs("UNC")
         print(self.xname)
         print(self.adjname)
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.in_channels, self.hidden_channels)] #, (self.hidden_channels, self.out_channels)]
@@ -3455,8 +3453,7 @@ class one_layer_gcn2:
         xinter.dump_outputs("UNC")
         print(self.xname)
         print(self.adjname)
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
-        # adjacency.dump_outputs("CSF")
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.hidden_channels, self.out_channels)] #, (self.hidden_channels, self.out_channels)]
@@ -3897,8 +3894,7 @@ class adj_linear2_mul:
         print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency.get_shape()}")
         xinter = MatrixGenerator(self.xname, (x.get_shape()[0], self.hidden_channels), [0, 1], dump_dir=os.getcwd() + self.file_path, format="UNC")
         xinter.dump_outputs("UNC")
-        # adjacency.dump_outputs("CSF")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         linear_out = MatrixGenerator(self.xname, (x.shape[0], self.hidden_channels), [0, 1], dump_dir=os.getcwd() + self.file_path, format="UNC")
         linear_out.dump_outputs("UNC")
         xinter = MatrixGenerator(self.xname, (x.get_shape()[0], self.hidden_channels), [0, 1], dump_dir=os.getcwd() + self.file_path, format="UNC")
