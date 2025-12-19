@@ -118,6 +118,14 @@ RUN pip install --upgrade pip && \
     pip install ogb
 
 # ============================================================================
+# Stage 7.5: Patch PyTorch libraries for PyTorch 2.6+ compatibility
+# ============================================================================
+# Fix PyTorch 2.6+ weights_only default breaking change for OGB datasets
+COPY scripts/patch_pytorch_libs.sh scripts/patch_pytorch_libs.sh
+RUN chmod +x scripts/patch_pytorch_libs.sh && \
+    bash scripts/patch_pytorch_libs.sh
+
+# ============================================================================
 # Stage 8: Copy remaining source code
 # ============================================================================
 COPY . .

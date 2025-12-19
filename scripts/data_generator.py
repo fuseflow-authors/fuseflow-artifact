@@ -308,18 +308,25 @@ def load_dataset_memory_efficient(dataset_name, root_dir, name, use_mmap=True):
                     data.x = None
 
             # Handle edge index efficiently
-            # edge_index = graph['edge_index']
-            data.edge_index = torch.from_numpy(graph['edge_index']) if 'edge_index' in graph else torch.from_numpy(graph['edge_index_dict'][('author', 'writes', 'paper')])
-            # if isinstance(edge_index, np.ndarray) and edge_index.dtype != np.int64:
-            #     edge_index = edge_index.astype(np.int64)
-            # data.edge_index = torch.from_numpy(edge_index)
+            if 'edge_index' in graph:
+                data.edge_index = torch.from_numpy(graph['edge_index'])
+                data.num_nodes = graph['num_nodes'] if isinstance(graph.get('num_nodes'), int) else None
+            elif 'edge_index_dict' in graph:
+                # For heterogeneous graphs, find appropriate edge type
+                first_key = list(graph['edge_index_dict'].keys())[0]
+                data.edge_index = torch.from_numpy(graph['edge_index_dict'][first_key])
+                data.num_nodes = None
+            else:
+                data.edge_index = None
+                data.num_nodes = None
 
             # Handle edge features
             data.edge_attr = graph['edge_feat'] if 'edge_feat' in graph else None
             data.y = labels
-            data.num_nodes = graph['num_nodes'] if 'num_nodes' in graph else None
 
-            return data, dataset.num_classes
+            # Link prediction datasets don't have num_classes
+            num_classes = getattr(dataset, 'num_classes', 2)  # Default to 2 for binary link prediction
+            return data, num_classes
         else:
             # Handle standard PyG datasets
             dataset = DatasetClass(root=root_dir, name=name)
@@ -384,11 +391,36 @@ def load_dataset(dataset_name, root_dir, name):
 
             # Convert OGB format to PyG format
             data = torch_geometric.data.data.Data()
-            data.x = torch.from_numpy(graph['node_feat']) if 'node_feat' in graph else None
-            data.edge_index = torch.from_numpy(graph['edge_index']) if 'edge_index' in graph else torch.from_numpy(graph['edge_index_dict'][('author', 'writes', 'paper')])
+
+            # Handle heterogeneous graphs (like ogbn-mag) vs homogeneous graphs
+            if 'node_feat' in graph:
+                data.x = torch.from_numpy(graph['node_feat'])
+            elif 'node_feat_dict' in graph:
+                # For heterogeneous graphs, use paper node features
+                data.x = torch.from_numpy(graph['node_feat_dict']['paper'])
+            else:
+                data.x = None
+
+            if 'edge_index' in graph:
+                data.edge_index = torch.from_numpy(graph['edge_index'])
+                data.num_nodes = graph['num_nodes'] if isinstance(graph.get('num_nodes'), int) else None
+            elif 'edge_index_dict' in graph:
+                # For heterogeneous graphs, use cites relationship between papers
+                if ('paper', 'cites', 'paper') in graph['edge_index_dict']:
+                    data.edge_index = torch.from_numpy(graph['edge_index_dict'][('paper', 'cites', 'paper')])
+                    # Get number of paper nodes
+                    data.num_nodes = graph['num_nodes_dict']['paper'] if 'num_nodes_dict' in graph else None
+                else:
+                    # Fallback to first available edge type
+                    first_key = list(graph['edge_index_dict'].keys())[0]
+                    data.edge_index = torch.from_numpy(graph['edge_index_dict'][first_key])
+                    data.num_nodes = None
+            else:
+                data.edge_index = None
+                data.num_nodes = None
+
             data.edge_attr = graph['edge_feat'] if 'edge_feat' in graph else None
             data.y = labels
-            data.num_nodes = graph['num_nodes'] if 'num_nodes' in graph else None
 
             # Get number of classes
             if dataset_name == 'ogbn':
@@ -396,7 +428,7 @@ def load_dataset(dataset_name, root_dir, name):
             else:
                 num_classes = len(torch.unique(labels)) if labels is not None else 1
 
-            return data, dataset.num_classes
+            return data, num_classes
         else:
             # Handle standard PyG datasets
             dataset = DatasetClass(root=root_dir, name=name)
@@ -514,14 +546,61 @@ def data_gen(dataset_name, root_dir, name, xname=None, adjname=None, path=None, 
     else:
         features = data.x
 
-    # Convert edge_index to adjacency matrix for MatrixGenerator
+    # Convert edge_index to adjacency matrix
     edge_index = data.edge_index.numpy()
-    num_nodes = features.shape[0]
-    # Create sparse adjacency matrix from edge_index
-    adj = np.zeros((num_nodes, num_nodes), dtype=np.float32)
-    adj[edge_index[0], edge_index[1]] = 1.0
+    num_edges = edge_index.shape[1]
 
-    return MatrixGenerator(xname, features.shape, mode_ordering=xmode, sparsity=0.1, dump_dir=os.getcwd() + path, tensor=features, format="UNC"), MatrixGenerator(adjname, adj.shape, mode_ordering=adjmode, dump_dir=os.getcwd() + path, tensor=adj, format="CSF")
+    # Determine num_nodes: must be at least as large as the max edge index + 1
+    # This is critical for heterogeneous graphs where num_nodes might be incorrect
+    max_edge_idx = int(edge_index.max()) + 1
+
+    if data.num_nodes is not None and data.num_nodes >= max_edge_idx:
+        num_nodes = data.num_nodes
+    else:
+        # Use max of edge index and features shape to ensure matrix is large enough
+        num_nodes = max(max_edge_idx, features.shape[0])
+
+    # Calculate if dense matrix would exceed memory threshold
+    dense_size_gb = (num_nodes * num_nodes * 4) / (1024**3)
+
+    if dense_size_gb > 10:
+        # For large graphs, use scipy sparse matrix and dump directly
+        from scipy.sparse import coo_matrix
+        adj_sparse = coo_matrix(
+            (np.ones(num_edges, dtype=np.float32),
+             (edge_index[0], edge_index[1])),
+            shape=(num_nodes, num_nodes)
+        )
+
+        # Create wrapper class that mimics MatrixGenerator interface
+        class SparseMatrixWrapper:
+            def __init__(self, name, sparse_mat, dump_dir):
+                self.name = name
+                self.sparse_mat = sparse_mat
+                self.shape = sparse_mat.shape
+                self.dump_dir = dump_dir
+
+            def dump_outputs(self, format):
+                if format == "CSF":
+                    dump_sparse_csr_fast(self.name, self.sparse_mat, self.dump_dir)
+
+            def get_shape(self):
+                return self.shape
+
+            def __getitem__(self, idx):
+                # Support subscripting for compatibility with debug print statements
+                # Return shape as tuple when subscripted
+                return self.shape[idx] if isinstance(idx, int) else self.shape
+
+        print(f"Using scipy sparse matrix for large graph ({num_nodes} nodes, {dense_size_gb:.1f}GB if dense, actual: {num_edges * 12 / (1024**2):.1f}MB)")
+        return (MatrixGenerator(xname, features.shape, mode_ordering=xmode, sparsity=0.1, dump_dir=os.getcwd() + path, tensor=features, format="UNC"),
+                SparseMatrixWrapper(adjname, adj_sparse, os.getcwd() + path))
+    else:
+        # For smaller graphs, create dense adjacency matrix
+        adj = np.zeros((num_nodes, num_nodes), dtype=np.float32)
+        adj[edge_index[0], edge_index[1]] = 1.0
+        return (MatrixGenerator(xname, features.shape, mode_ordering=xmode, sparsity=0.1, dump_dir=os.getcwd() + path, tensor=features, format="UNC"),
+                MatrixGenerator(adjname, adj.shape, mode_ordering=adjmode, dump_dir=os.getcwd() + path, tensor=adj, format="CSF"))
 
 
 def weight_gen(feature_list, density, mode="random", num_linears=2):
@@ -1135,7 +1214,7 @@ class one_layer_graphsage2:
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
         # print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
         x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         weight_names = self.weight
         bias_names = self.bias
         linear_shapes = [(self.hidden_channels, self.out_channels)] #, (self.hidden_channels, self.out_channels)]
@@ -1234,7 +1313,7 @@ class graphsage_adj_x1:
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
         # print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
         x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         # weight_names = self.weight
         # bias_names = self.bias
         # linear_shapes = [(self.in_channels, self.hidden_channels), (self.hidden_channels, self.out_channels)]
@@ -1629,7 +1708,7 @@ class graphsage_adj_x2:
         x, adjacency = data_gen(self.dataset_name, self.root_dir, self.name, self.xname, self.adjname, self.file_path)
         # print(f"shape of features {x.get_shape()}, shape of adjacency {adjacency[0]}")
         # x.dump_outputs("UNC")
-        dump_data("tensor_" + self.adjname, adjacency, os.getcwd() + self.file_path)
+        adjacency.dump_outputs("CSF")
         linear_out = MatrixGenerator(self.xname, (x.shape[0], self.hidden_channels), [0, 1], dump_dir=os.getcwd() + self.file_path, format="UNC")
         linear_out.dump_outputs("UNC")
 

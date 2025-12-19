@@ -65,6 +65,43 @@ DEFAULT_SPARSITY = {
 }
 
 # ============================================================================
+# Dataset Pre-download Function (prevents race conditions with parallel workers)
+# ============================================================================
+def predownload_datasets(datasets_to_download):
+    """
+    Pre-download datasets before running parallel benchmarks.
+    This prevents race conditions where multiple workers try to download
+    the same dataset simultaneously.
+
+    Args:
+        datasets_to_download: List of tuples (dataset_type, dataset_name)
+    """
+    import torch
+
+    data_path = os.environ.get('DATA_PATH', '/tmp/data')
+    os.makedirs(data_path, exist_ok=True)
+
+    for dataset_type, dataset_name in datasets_to_download:
+        safe_print(f"Pre-downloading dataset: {dataset_type}/{dataset_name}...")
+        try:
+            if dataset_type == 'Planetoid':
+                from torch_geometric.datasets import Planetoid
+                Planetoid(root=data_path, name=dataset_name)
+            elif dataset_type == 'CitationFull':
+                from torch_geometric.datasets import CitationFull
+                CitationFull(root=data_path, name=dataset_name)
+            elif dataset_type == 'ogbl':
+                from ogb.linkproppred import LinkPropPredDataset
+                LinkPropPredDataset(name=dataset_name, root=data_path)
+            elif dataset_type == 'ogbn':
+                from ogb.nodeproppred import NodePropPredDataset
+                NodePropPredDataset(name=dataset_name, root=data_path)
+            safe_print(f"  ✓ {dataset_type}/{dataset_name} ready")
+        except Exception as e:
+            safe_print(f"  ✗ Failed to download {dataset_type}/{dataset_name}: {e}")
+
+
+# ============================================================================
 # SAE (Sparse Autoencoder) Configuration
 # ============================================================================
 SAE_CONFIG = {
@@ -474,6 +511,9 @@ def run_single_mlir(mlir_file, sparsity, build_dir, parfactor=1,
     # Set COMAL_ENABLE_HBM environment variable
     env['COMAL_ENABLE_HBM'] = '1' if enable_hbm else '0'
 
+    # Ensure TORCH_WEIGHTS_ONLY_LOAD is passed to subprocess
+    env['TORCH_WEIGHTS_ONLY_LOAD'] = '0'
+
     cmd = [
         sys.executable, str(SCRIPT_DIR / 'run_end_to_end.py'),
         '--infile', str(mlir_file),
@@ -823,6 +863,18 @@ def run_gcn_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, o
     if datasets is None:
         datasets = list(GCN_CONFIG.keys())
 
+    # Pre-download datasets to avoid race conditions with parallel workers
+    if workers > 1:
+        datasets_to_download = []
+        for dataset in datasets:
+            if dataset in GCN_CONFIG:
+                config = GCN_CONFIG[dataset]
+                datasets_to_download.append((config['dataset_type'], config['dataset_name']))
+        if datasets_to_download:
+            safe_print("\n=== Pre-downloading GCN datasets ===")
+            predownload_datasets(datasets_to_download)
+            safe_print("")
+
     # Build all jobs
     jobs = []
     job_id = 0
@@ -939,6 +991,18 @@ def run_graphsage_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=N
 
     if datasets is None:
         datasets = list(GRAPHSAGE_CONFIG.keys())
+
+    # Pre-download datasets to avoid race conditions with parallel workers
+    if workers > 1:
+        datasets_to_download = []
+        for dataset in datasets:
+            if dataset in GRAPHSAGE_CONFIG:
+                config = GRAPHSAGE_CONFIG[dataset]
+                datasets_to_download.append((config['dataset_type'], config['dataset_name']))
+        if datasets_to_download:
+            safe_print("\n=== Pre-downloading GraphSAGE datasets ===")
+            predownload_datasets(datasets_to_download)
+            safe_print("")
 
     # Build all jobs
     jobs = []
