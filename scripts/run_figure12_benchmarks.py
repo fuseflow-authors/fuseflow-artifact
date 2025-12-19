@@ -1099,13 +1099,24 @@ def run_graphsage_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=N
         }
 
         # Unfused
+        # GraphSAGE has 2 linear layers per GraphSAGE layer (self + neighbor paths)
+        # So we need to double-count linear operations
         unfused_jobs = [r for r in dataset_jobs if r.get('fusion_type') == 'unfused']
-        unfused_breakdown = [{'file': r['op_name'], 'success': r['success'], 'cycles': r['cycles']} for r in unfused_jobs]
+        unfused_breakdown = []
+        unfused_cycles_total = 0
+
+        for r in unfused_jobs:
+            cycles = r['cycles'] or 0
+            # Double count linear mul and bias operations (for self + neighbor)
+            if 'linear' in r['op_name'] and ('mul' in r['op_name'] or 'bias' in r['op_name']):
+                cycles = cycles * 2
+            unfused_breakdown.append({'file': r['op_name'], 'success': r['success'], 'cycles': cycles})
+            unfused_cycles_total += cycles
+
         unfused_success = all(r['success'] for r in unfused_jobs) if unfused_jobs else False
-        unfused_cycles = sum(r['cycles'] or 0 for r in unfused_jobs) if unfused_success else None
         dataset_results['unfused'] = {
             'success': unfused_success,
-            'cycles': unfused_cycles,
+            'cycles': unfused_cycles_total if unfused_success else None,
             'breakdown': unfused_breakdown
         }
 

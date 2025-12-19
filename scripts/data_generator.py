@@ -312,10 +312,16 @@ def load_dataset_memory_efficient(dataset_name, root_dir, name, use_mmap=True):
                 data.edge_index = torch.from_numpy(graph['edge_index'])
                 data.num_nodes = graph['num_nodes'] if isinstance(graph.get('num_nodes'), int) else None
             elif 'edge_index_dict' in graph:
-                # For heterogeneous graphs, find appropriate edge type
-                first_key = list(graph['edge_index_dict'].keys())[0]
-                data.edge_index = torch.from_numpy(graph['edge_index_dict'][first_key])
-                data.num_nodes = None
+                # For heterogeneous graphs, use cites relationship between papers
+                if ('paper', 'cites', 'paper') in graph['edge_index_dict']:
+                    data.edge_index = torch.from_numpy(graph['edge_index_dict'][('paper', 'cites', 'paper')])
+                    # Get number of paper nodes
+                    data.num_nodes = graph['num_nodes_dict']['paper'] if 'num_nodes_dict' in graph else None
+                else:
+                    # Fallback to first available edge type
+                    first_key = list(graph['edge_index_dict'].keys())[0]
+                    data.edge_index = torch.from_numpy(graph['edge_index_dict'][first_key])
+                    data.num_nodes = None
             else:
                 data.edge_index = None
                 data.num_nodes = None
