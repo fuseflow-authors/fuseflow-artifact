@@ -76,7 +76,18 @@ python3 scripts/plot_figure16.py
 echo "✓ Figure 16 complete: results/figure16.pdf"
 echo ""
 
-# Figure 17 - Dataflow order sweep
+# Figure 17 - Dataflow order sweep (uses v1 branch of comal)
+echo "========================================"
+echo "Switching to Comal v1 for Figure 17"
+echo "========================================"
+cd comal
+git checkout v1
+echo "Rebuilding Comal with maturin..."
+maturin develop -r
+cd ..
+echo "✓ Comal v1 ready"
+echo ""
+
 echo "========================================"
 echo "Running Figure 17: Dataflow Order Sweep"
 echo "Estimated time: ~5 compute-minutes"

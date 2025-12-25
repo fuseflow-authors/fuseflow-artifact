@@ -3,6 +3,7 @@ Repo for FuseFlow artifact generation
 
 ## Overview
 - Getting Started (5 human-minutes + 30 compute-minutes)
+- **Data Persistence Setup** - **CRITICAL: Read this to avoid data loss**
 - **Quick Start: Run All Benchmarks** (5 human-minutes + 96 compute-hours) - **Recommended for artifact reviewers**
 - Run Experiments:
     - Run Top-Level Script (5 human-minutes + 96 compute-hours)
@@ -16,15 +17,10 @@ Repo for FuseFlow artifact generation
 ----
 - [Optional] How to Reuse Artifact Beyond the Paper (10+ human-minutes)
 - [Optional] Detailed Explanation of What the Top-Level Script Does
-    - Run and Validate Figure 12: Performance Comparison
-    - Run and Validate Figure 14: GCN FLOPs and Memory Analysis
-    - Run and Validate Figure 15a: Parallelism Factor Sweep
-    - Run and Validate Figure 15b: Parallelism Location Sweep
-    - Run and Validate Figure 16: Block Size Comparison
-    - Run and Validate Figure 17: Dataflow Order Sweep
 
 ## Getting Started
 This guide assumes the user has a working installation of Docker and some version of Python 3 installed.
+
 - Run the following commands to build the docker image named `fuseflow-artifact` locally from the files in this GitHub repo.
   ```
   git submodule update --init --recursive
@@ -32,59 +28,114 @@ This guide assumes the user has a working installation of Docker and some versio
   ```
   *NOTE:* Building the Docker image requires ~16GB RAM during LLVM compilation, ~50GB disk space, and takes 10-20 minutes depending on CPU.
 
-- Once the image is built, run a docker container with a bash terminal
-  ```
-  docker run -d -it --rm fuseflow-artifact bash
-  ```
-  - The above command should print out a `CONTAINER_ID`
-- Attach to the docker container using the command below and the `CONTAINER_ID` from the previous step
-  ```
-  docker attach <CONTAINER_ID>
-  ```
-- *IMPORTANT:* Do not type `exit` in the docker terminal as this will kill the container. The proper way to exit the docker is the sequence `CTRL-p, CTRL-q`.
+## Data Persistence Setup
+
+**CRITICAL:** The default Docker workflow can cause data loss on system crashes or container restarts. Follow these steps to ensure your results are preserved:
+
+### Step 1: Create persistent storage directories on your host machine
+```bash
+mkdir -p ~/fuseflow_data/results
+mkdir -p ~/fuseflow_data/logs
+mkdir -p ~/fuseflow_data/checkpoints
+```
+
+### Step 2: Run container with volume mounts (NO --rm flag!)
+```bash
+docker run -d -it \
+  -v ~/fuseflow_data/results:/fuseflow-artifact/results \
+  -v ~/fuseflow_data/logs:/fuseflow-artifact/logs \
+  -v ~/fuseflow_data/checkpoints:/fuseflow-artifact/checkpoints \
+  --name fuseflow-container \
+  fuseflow-artifact bash
+```
+
+**Key changes from old approach:**
+- ✅ **Removed `--rm` flag** - Container persists after stopping
+- ✅ **Added volume mounts** - Data stored on host filesystem
+- ✅ **Named container** - Easy to restart with `docker start fuseflow-container`
+
+### Step 3: Attach to the container
+```bash
+docker attach fuseflow-container
+```
+
+### Step 4: Exit safely without killing container
+- **IMPORTANT:** Do not type `exit` - this will kill the container
+- **Use `CTRL-p, CTRL-q`** to detach safely
+- Container keeps running in background
+
+### Step 5: Reattach after system crash or logout
+```bash
+docker start fuseflow-container    # Start if stopped
+docker attach fuseflow-container   # Reattach to running container
+```
+
+### What happens now when your system crashes?
+- ✅ All results, logs, and checkpoints are safe in `~/fuseflow_data/`
+- ✅ Container can be restarted with `docker start fuseflow-container`
+- ✅ No data loss from ephemeral container storage
 
 ## Quick Start: Run All Benchmarks (5 human-minutes + 96 compute-hours)
 For artifact reviewers who want to run all experiments with a single command:
 
 - Within the Docker container, run:
   ```
-  ./scripts/run_all_benchmarks.sh
+  ./scripts/run_all_benchmarks.sh 2>&1 | tee logs/run_all_benchmarks.log
   ```
   This script will:
   - Run all benchmark experiments (Figures 12, 14, 15a, 15b, 16, 17)
   - Generate all PDF plots automatically
-  - Save results to the `results/` directory
+  - Save results to the `results/` directory (persisted to host via volume mount)
+  - Log all output to `logs/run_all_benchmarks.log`
 
-- Once complete, exit the Docker container (`CTRL-p, CTRL-q`) and extract results to your host machine:
+- **Monitor progress** (from host machine):
+  ```bash
+  tail -f ~/fuseflow_data/logs/run_all_benchmarks.log
   ```
-  ./scripts/extract_results.sh
+
+- **Check results while running** (from host machine):
+  ```bash
+  ls -lh ~/fuseflow_data/results/
   ```
-  This will copy all PDFs and JSON files to the `output_figures/` directory on your host.
+
+- Once complete, exit the Docker container (`CTRL-p, CTRL-q`) and view results:
+  ```bash
+  ls ~/fuseflow_data/results/
+  ```
+  All PDFs and JSON files are now on your host filesystem.
 
 ## Run Top-Level Script (5 human-minutes + 96 compute-hours)
 We provide scripts to generate all of the results within the container.
 
+**IMPORTANT:** Always redirect output to log files to preserve results:
+
 - Within the Docker container, run the following commands to generate all results:
   ```
   # Figure 12 - Main performance comparison (SAE, GCN, GraphSAGE, GPT-3)
-  python3 scripts/run_figure12_benchmarks.py --mode complete
+  python3 scripts/run_figure12_benchmarks.py --mode complete 2>&1 | tee logs/figure12.log
 
   # Figure 14 - GCN FLOPs and memory metrics
-  python3 scripts/process_figure14_metrics.py
+  python3 scripts/process_figure14_metrics.py 2>&1 | tee logs/figure14.log
 
   # Figure 15a - Sparsity sweep
-  python3 scripts/run_figure15a_sweep.py
+  python3 scripts/run_figure15a_sweep.py 2>&1 | tee logs/figure15a.log
 
   # Figure 15b - Parallelism sweep
-  python3 scripts/run_figure15b_sweep.py
+  python3 scripts/run_figure15b_sweep.py 2>&1 | tee logs/figure15b.log
 
   # Figure 16 - Block size comparison
-  python3 scripts/run_figure16.py
+  python3 scripts/run_figure16.py 2>&1 | tee logs/figure16.log
 
   # Figure 17 - Dataflow order sweep
-  python3 scripts/run_figure17_sweep.py
+  python3 scripts/run_figure17_sweep.py 2>&1 | tee logs/figure17.log
   ```
-- Once this completes, you can extract the figures from the Docker container by following the instructions in the section [Validate All Results](#validate-all-results) in this README.
+
+- **Monitor from host machine:**
+  ```bash
+  tail -f ~/fuseflow_data/logs/figure12.log
+  ```
+
+- Once this completes, results are automatically saved to `~/fuseflow_data/results/` on your host machine.
 
 ## Run Figure 12: Performance Comparison (5 human-minutes + 96 compute-hours)
 Figure 12 compares performance across four model architectures (SAE, GCN, GraphSAGE, GPT-3).
@@ -103,7 +154,7 @@ The Figure 12 benchmark script supports parallel execution of simulation jobs us
 
 To modify the worker count, edit the `--workers`/`-w` parameter in [scripts/run_all_benchmarks.sh](scripts/run_all_benchmarks.sh#L26) or specify it when running manually:
 ```bash
-python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 --no-hbm
+python3 scripts/run_figure12_benchmarks.py --mode medium --workers 4 --no-hbm 2>&1 | tee logs/figure12.log
 ```
 
 **HBM Simulation:**
@@ -134,27 +185,27 @@ Choose one of the following options to run:
 
 1. Run `--mode fast` to run a restricted set of experiments for quick testing (about 1 compute-hour):
    ```
-   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora --mode fast
+   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora --mode fast 2>&1 | tee logs/figure12_fast.log
    ```
 
 2. Run `--mode complete` to run the full set of benchmarks that will take over a week:
    ```
-   python3 scripts/run_figure12_benchmarks.py --mode complete
+   python3 scripts/run_figure12_benchmarks.py --mode complete 2>&1 | tee logs/figure12_complete.log
    ```
 
 3. Run specific models or datasets:
    ```
    # Run only GCN on specific datasets
-   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora cora_ml dblp
+   python3 scripts/run_figure12_benchmarks.py --model gcn --gcn-datasets cora cora_ml dblp 2>&1 | tee logs/figure12_gcn.log
 
    # Run only SAE benchmarks
-   python3 scripts/run_figure12_benchmarks.py --model sae
+   python3 scripts/run_figure12_benchmarks.py --model sae 2>&1 | tee logs/figure12_sae.log
 
    # Run only GPT-3 BigBird benchmarks
-   python3 scripts/run_figure12_benchmarks.py --model gpt3
+   python3 scripts/run_figure12_benchmarks.py --model gpt3 2>&1 | tee logs/figure12_gpt3.log
    ```
 
-- The script generates a `figure12_results.json` file with cycle counts for each configuration.
+- The script generates a `figure12_results.json` file with cycle counts for each configuration (automatically saved to `results/`).
 
 - Once all desired benchmarks are run, generate Figure 12 as a PDF:
   ```
@@ -166,9 +217,8 @@ Figure 14 analyzes computational efficiency and memory access patterns for GCN.
 
 - Run the following commands:
   ```
-  python3 scripts/process_figure14_metrics.py
+  python3 scripts/process_figure14_metrics.py 2>&1 | tee logs/figure14.log
   ```
-  - This script collects FLOPs and memory metrics for GCN across different fusion configurations.
 
 - Generate Figure 14 as a PDF:
   ```
@@ -181,7 +231,7 @@ Figure 15a shows how performance varies with different sparsity levels.
 
 - Run the sparsity sweep script:
   ```
-  python3 scripts/run_figure15a_sweep.py
+  python3 scripts/run_figure15a_sweep.py 2>&1 | tee logs/figure15a.log
   ```
   - Results are saved to `figure15a_results.json`
 
@@ -196,7 +246,7 @@ Figure 15b shows how performance scales with different parallelization factors.
 
 - Run the parallelism sweep script:
   ```
-  python3 scripts/run_figure15b_sweep.py
+  python3 scripts/run_figure15b_sweep.py 2>&1 | tee logs/figure15b.log
   ```
   - Results are saved to `figure15b_results.json`
 
@@ -211,7 +261,7 @@ Figure 16 compares performance across different block sizes.
 
 - Run the block size comparison script:
   ```
-  python3 scripts/run_figure16.py
+  python3 scripts/run_figure16.py 2>&1 | tee logs/figure16.log
   ```
   - Results are saved to `figure16_results.json`
 
@@ -226,7 +276,7 @@ Figure 17 evaluates different dataflow ordering strategies.
 
 - Run the dataflow order sweep script:
   ```
-  python3 scripts/run_figure17_sweep.py
+  python3 scripts/run_figure17_sweep.py 2>&1 | tee logs/figure17.log
   ```
   - Results are saved to `figure17_results.json`
 
@@ -237,28 +287,21 @@ Figure 17 evaluates different dataflow ordering strategies.
   - The script will create a plot at the location `/fuseflow-artifact/results/figure17.pdf`.
 
 ## Validate All Results
-- Exit the docker (`CTRL-p, CTRL-q`)
-- To extract all of the figures from the docker to your local machine for viewing, run the following commands from outside the docker:
-  ```
-  # Get the container ID
-  CONTAINER_ID=$(docker ps -q --filter ancestor=fuseflow-artifact)
 
-  # Create output directory
-  mkdir -p output_figures
+Since you used volume mounts, all results are already on your host machine at `~/fuseflow_data/results/`. Simply view them directly:
 
-  # Copy results
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure12.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure14.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure15a.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure15b.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure16.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/results/figure17.pdf output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/figure12_results.json output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/figure15a_results.json output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/figure15b_results.json output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/figure16_results.json output_figures/
-  docker cp $CONTAINER_ID:/fuseflow-artifact/figure17_results.json output_figures/
-  ```
+```bash
+ls -lh ~/fuseflow_data/results/
+```
+
+You can open the PDFs directly from your host machine:
+```bash
+# On Linux
+xdg-open ~/fuseflow_data/results/figure12.pdf
+
+# On macOS
+open ~/fuseflow_data/results/figure12.pdf
+```
 
 - Validate that the plot in `figure12.pdf` matches Figure 12 in the paper (performance comparison).
 - Validate that the plot in `figure14.pdf` matches Figure 14 in the paper (GCN FLOPs and memory analysis).
@@ -427,6 +470,9 @@ fuseflow-artifact/
 ├── sam/                 # Sparse Abstract Machine library
 ├── scripts/             # Benchmark and plotting scripts
 ├── tortilla-visualizer/ # Dataflow graph visualization tool
+├── results/             # Output directory (mounted to host)
+├── logs/                # Log files (mounted to host)
+├── checkpoints/         # Checkpoint files (mounted to host)
 ├── setup.sh             # Automated setup script
 ├── Dockerfile           # Docker build configuration
 └── README.md            # This file
@@ -451,6 +497,8 @@ fuseflow-artifact/
 | `maturin` build fails | Ensure virtual environment is activated |
 | Out of memory during benchmarks | Use `--mode fast` or reduce parallelization |
 | Missing `clang`/`lld` | Install: `sudo apt install clang lld` |
+| Container deleted after crash | DO NOT use `--rm` flag when running container |
+| Data lost on reboot | Ensure volume mounts are specified in `docker run` |
 
 ### Verifying Installation
 
@@ -482,5 +530,3 @@ The artifact should reproduce the following key findings from the paper:
 - Floating-point non-determinism
 
 The relative speedups and trends should match the paper's results.
-
-
