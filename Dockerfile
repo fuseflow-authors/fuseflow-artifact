@@ -61,7 +61,7 @@ RUN python3 -m venv /opt/fuseflow-venv
 ENV PATH="/opt/fuseflow-venv/bin:$PATH"
 ENV VIRTUAL_ENV="/opt/fuseflow-venv"
 
-RUN pip install --upgrade pip &&     pip install -r samml/requirements.txt &&     pip install -r sam/requirements.txt &&     pip install -r tortilla-visualizer/requirement.txt &&     pip install torch --index-url https://download.pytorch.org/whl/cpu &&     pip install torch_geometric networkx tqdm pandas scipy matplotlib &&     pip install -U "maturin[patchelf]" &&     pip install ogb
+RUN pip install --upgrade pip &&     pip install -r samml/requirements.txt &&     pip install -r sam/requirements.txt &&     pip install -r tortilla-visualizer/requirement.txt &&     pip install torch --index-url https://download.pytorch.org/whl/cpu &&     pip install torch_geometric networkx tqdm pandas scipy matplotlib seaborn SciencePlots &&     pip install -U "maturin[patchelf]" &&     pip install ogb 
 
 # ============================================================================
 # Stage 7.5: Patch PyTorch libraries for PyTorch 2.6+ compatibility
