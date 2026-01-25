@@ -14,7 +14,7 @@ export DATA_PATH=/tmp/data
 
 PYTHON=python3
 SCRIPT=$ARTIFACT_ROOT/scripts/run_end_to_end.py
-MLIR=$ARTIFACT_ROOT/samml/tests/models/gpt-3/multihead_attention.mlir
+MLIR=$ARTIFACT_ROOT/fuseflow-compiler/tests/models/gpt-3/multihead_attention.mlir
 OUTPUT_JSON=$ARTIFACT_ROOT/figure16_results.json
 
 echo "=========================================="
@@ -41,7 +41,7 @@ for PAR in 1 2 4 8 16 32 64; do
 
     $PYTHON $SCRIPT \
         --infile $MLIR \
-        --build samml/build \
+        --build fuseflow-compiler/build \
         -sp 0 \
         -par $PAR \
         -sl 2 \
@@ -88,7 +88,7 @@ for PAR in 1 2 4; do
 
     $PYTHON $SCRIPT \
         --infile $MLIR \
-        --build samml/build \
+        --build fuseflow-compiler/build \
         -sp 0 \
         -par $PAR \
         -sl 1 \
@@ -121,7 +121,7 @@ LOG=$ARTIFACT_ROOT/mha_sl1_par4_sl2_par4.log
 
 $PYTHON $SCRIPT \
     --infile $MLIR \
-    --build samml/build \
+    --build fuseflow-compiler/build \
     -sp 0 \
     -par 4 \
     -sl 1 \

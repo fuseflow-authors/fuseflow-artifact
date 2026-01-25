@@ -48,7 +48,7 @@ def run_benchmark(parfactor, streamlevel, build_dir, timeout=DEFAULT_TIMEOUT,
     Returns:
         dict: {'success': bool, 'cycles': int or None, 'output': str}
     """
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
     mlir_file = models_dir / MHA_MLIR
 
     if not mlir_file.exists():

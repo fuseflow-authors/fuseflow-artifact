@@ -51,7 +51,7 @@ def run_mha_benchmark(block_size, use_trueblock, sparsity, build_dir, parfactor=
     Returns:
         dict: {'success': bool, 'cycles': int or None, 'output': str}
     """
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
     mlir_file = models_dir / MHA_MLIR
 
     if not mlir_file.exists():

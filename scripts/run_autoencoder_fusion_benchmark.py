@@ -124,7 +124,7 @@ def run_single_mlir(mlir_file, sparsity, build_dir, parfactor=1):
 def run_benchmark(dataset, sparsity, build_dir, parfactor, only=None):
     """Run fusion benchmark for a specific dataset."""
     config = DATASET_CONFIG[dataset]
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
 
     print("\n" + "="*80)
     print(f"DATASET: {config['name']} ({config['resolution']})")

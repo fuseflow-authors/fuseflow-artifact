@@ -4,7 +4,7 @@
 # Build artifacts (will be rebuilt in container)
 # NOTE: LLVM and OR-Tools builds are NOT excluded because they're copied
 # separately BEFORE the main COPY to maximize cache hits
-samml/build/
+fuseflow-compiler/build/
 comal/target/
 
 # Python cache

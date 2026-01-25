@@ -2,7 +2,7 @@
 # FuseFlow Artifact Setup Script
 #
 # This script sets up the complete FuseFlow artifact including:
-# - SAMML compiler (MLIR-based)
+# - FuseFlow compiler (MLIR-based)
 # - Comal cycle-accurate simulator (Rust)
 # - SAM library
 # - Tortilla visualizer
@@ -41,8 +41,8 @@ source fuseflow-venv/bin/activate
 
 pip install --upgrade pip
 
-# Install SAMML requirements (lit for LLVM testing)
-pip install -r samml/requirements.txt
+# Install FuseFlow requirements (lit for LLVM testing)
+pip install -r fuseflow-compiler/requirements.txt
 
 # Install SAM requirements
 pip install -r sam/requirements.txt
@@ -57,13 +57,13 @@ pip install torch torch_geometric maturin networkx tqdm pandas
 pip install -e sam/
 
 # ============================================================================
-# Step 3: Build LLVM/MLIR (for SAMML compiler)
+# Step 3: Build LLVM/MLIR (for FuseFlow compiler)
 # ============================================================================
 echo ""
-echo "=== Step 3: Building LLVM/MLIR (this will take a while ~30-60 min) ==="
+echo "=== Step 3: Building LLVM/MLIR (this will take a while ~10-20 min) ==="
 echo "Note: Requires 32GB+ RAM. If build fails, try reducing parallelism."
 
-cd samml/external/llvm-project
+cd fuseflow-compiler/external/llvm-project
 mkdir -p build && cd build
 
 # Build MLIR with optimizations for memory usage
@@ -83,12 +83,12 @@ cmake --build . --target check-mlir -j$(nproc)
 cd "$SCRIPT_DIR"
 
 # ============================================================================
-# Step 4: Build OR-Tools (for SAMML compiler optimization passes)
+# Step 4: Build OR-Tools (for FuseFlow compiler optimization passes)
 # ============================================================================
 echo ""
 echo "=== Step 4: Building OR-Tools ==="
 
-cd samml/external
+cd fuseflow-compiler/external
 
 # Clone or-tools if not present (it's a submodule)
 if [ ! -d "or-tools" ]; then
@@ -109,12 +109,12 @@ cmake --build . --config Release --target all -j$(nproc)
 cd "$SCRIPT_DIR"
 
 # ============================================================================
-# Step 5: Build SAMML Compiler
+# Step 5: Build FuseFlow Compiler
 # ============================================================================
 echo ""
-echo "=== Step 5: Building SAMML compiler ==="
+echo "=== Step 5: Building FuseFlow compiler ==="
 
-cd samml
+cd fuseflow-compiler
 mkdir -p build && cd build
 
 cmake -G Ninja .. \

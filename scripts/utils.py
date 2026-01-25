@@ -5,7 +5,7 @@ import re
 
 PROJECT_ROOT_DIR = Path("/fuseflow-artifact")
 ARTIFACT_ROOT = PROJECT_ROOT_DIR
-PROJECT_ROOT = PROJECT_ROOT_DIR / "samml"
+PROJECT_ROOT = PROJECT_ROOT_DIR / "fuseflow-compiler"
 
 
 def run_command_list(command_list, cwd=None, debug=True):

@@ -37,23 +37,23 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v24.0/pro
 # Stage 4: Copy LLVM source ONLY (for maximum cache efficiency)
 # ============================================================================
 WORKDIR /fuseflow-artifact
-COPY samml/external/llvm-project samml/external/llvm-project
+COPY fuseflow-compiler/external/llvm-project fuseflow-compiler/external/llvm-project
 
 # ============================================================================
 # Stage 5: Build LLVM/MLIR (this takes a long time - cache this!)
 # ============================================================================
-RUN cd samml/external/llvm-project &&     mkdir -p build && cd build &&     cmake -G Ninja ../llvm         -DLLVM_ENABLE_PROJECTS=mlir         -DLLVM_TARGETS_TO_BUILD="Native"         -DCMAKE_BUILD_TYPE=Release         -DLLVM_USE_SPLIT_DWARF=ON         -DLLVM_ENABLE_ASSERTIONS=ON         -DCMAKE_C_COMPILER=clang         -DCMAKE_CXX_COMPILER=clang++         -DLLVM_ENABLE_LLD=ON &&     ninja MLIRMlirOptMain &&     ninja check-mlir
+RUN cd fuseflow-compiler/external/llvm-project &&     mkdir -p build && cd build &&     cmake -G Ninja ../llvm         -DLLVM_ENABLE_PROJECTS=mlir         -DLLVM_TARGETS_TO_BUILD="Native"         -DCMAKE_BUILD_TYPE=Release         -DLLVM_USE_SPLIT_DWARF=ON         -DLLVM_ENABLE_ASSERTIONS=ON         -DCMAKE_C_COMPILER=clang         -DCMAKE_CXX_COMPILER=clang++         -DLLVM_ENABLE_LLD=ON &&     ninja MLIRMlirOptMain &&     ninja check-mlir
 
 # ============================================================================
 # Stage 6: Copy OR-Tools source and build
 # ============================================================================
-COPY samml/external/or-tools samml/external/or-tools
-RUN cd samml/external/or-tools &&     mkdir -p build && cd build &&     cmake -S .. -B .         -DBUILD_DEPS=ON         -DUSE_SCIP=OFF         -DUSE_HIGHS=OFF         -DUSE_COINOR=OFF &&     cmake --build . --config Release --target all -j$(nproc) &&     cmake --build . --config Release --target install -v
+COPY fuseflow-compiler/external/or-tools fuseflow-compiler/external/or-tools
+RUN cd fuseflow-compiler/external/or-tools &&     mkdir -p build && cd build &&     cmake -S .. -B .         -DBUILD_DEPS=ON         -DUSE_SCIP=OFF         -DUSE_HIGHS=OFF         -DUSE_COINOR=OFF &&     cmake --build . --config Release --target all -j$(nproc) &&     cmake --build . --config Release --target install -v
 
 # ============================================================================
 # Stage 7: Copy dependency files and install Python dependencies
 # ============================================================================
-COPY samml/requirements.txt samml/requirements.txt
+COPY fuseflow-compiler/requirements.txt fuseflow-compiler/requirements.txt
 COPY sam/requirements.txt sam/requirements.txt
 COPY tortilla-visualizer/requirement.txt tortilla-visualizer/requirement.txt
 
@@ -61,7 +61,7 @@ RUN python3 -m venv /opt/fuseflow-venv
 ENV PATH="/opt/fuseflow-venv/bin:$PATH"
 ENV VIRTUAL_ENV="/opt/fuseflow-venv"
 
-RUN pip install --upgrade pip &&     pip install -r samml/requirements.txt &&     pip install -r sam/requirements.txt &&     pip install -r tortilla-visualizer/requirement.txt &&     pip install torch --index-url https://download.pytorch.org/whl/cpu &&     pip install torch_geometric networkx tqdm pandas scipy matplotlib seaborn SciencePlots &&     pip install -U "maturin[patchelf]" &&     pip install ogb 
+RUN pip install --upgrade pip &&     pip install -r fuseflow-compiler/requirements.txt &&     pip install -r sam/requirements.txt &&     pip install -r tortilla-visualizer/requirement.txt &&     pip install torch --index-url https://download.pytorch.org/whl/cpu &&     pip install torch_geometric networkx tqdm pandas scipy matplotlib seaborn SciencePlots &&     pip install -U "maturin[patchelf]" &&     pip install ogb 
 
 # ============================================================================
 # Stage 7.5: Patch PyTorch libraries for PyTorch 2.6+ compatibility
@@ -77,9 +77,9 @@ COPY . .
 RUN pip install -e sam/
 
 # ============================================================================
-# Stage 9: Build SAMML compiler
+# Stage 9: Build FuseFlow compiler
 # ============================================================================
-RUN cd samml &&     mkdir -p build && cd build &&     cmake -G Ninja .. -DLLVM_EXTERNAL_LIT=$(which lit) &&     ninja
+RUN cd fuseflow-compiler &&     mkdir -p build && cd build &&     cmake -G Ninja .. -DLLVM_EXTERNAL_LIT=$(which lit) &&     ninja
 
 # ============================================================================
 # Stage 10: Build Comal simulator
@@ -112,7 +112,7 @@ echo \"\"\n\
 echo \"Verifying installation...\"\n\
 python3 -c \"import comal; print(\\\"✓ Comal OK\\\")\"\n\
 python3 -c \"import sam; print(\\\"✓ SAM OK\\\")\"\n\
-./samml/build/tools/sam-opt --version > /dev/null 2>&1 && echo \"✓ SAMML compiler OK\"\n\
+./fuseflow-compiler/build/tools/sam-opt --version > /dev/null 2>&1 && echo \"✓ FuseFlow compiler OK\"\n\
 echo \"\"\n\
 echo \"Quick start commands:\"\n\
 echo \"  # Run GCN benchmark on Cora (fast mode)\"\n\

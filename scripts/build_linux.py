@@ -12,7 +12,7 @@ git_command = ['git', 'submodule', 'update', '--init', '--recursive']
 run_command_list(git_command, cwd=ARTIFACT_ROOT)
 
 # Run external llvm build
-llvm_cwd = ARTIFACT_ROOT/'samml/external/llvm-project/'
+llvm_cwd = ARTIFACT_ROOT/'fuseflow-compiler/external/llvm-project/'
 
 llvm_cmake = 'cmake -G Ninja ../llvm' + \
    '-DLLVM_ENABLE_PROJECTS=mlir ' + \

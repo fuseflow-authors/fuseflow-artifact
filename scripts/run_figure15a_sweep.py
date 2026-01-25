@@ -126,7 +126,7 @@ def run_figure15a_sweep(build_dir, block_size=64, sparsity=0.0, timeout=DEFAULT_
     Returns:
         dict: Results with parfactor as keys and cycles as values
     """
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
     mlir_file = models_dir / 'gpt-3' / 'multihead_attention.mlir'
 
     if not mlir_file.exists():

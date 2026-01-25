@@ -26,7 +26,7 @@ ORDER_LABELS = [
 ]
 
 # Default test case for Figure 17: nested matmuls with dynamic dimensions
-DEFAULT_MLIR = "samml/tests/kernels/nested_matmuls.mlir"
+DEFAULT_MLIR = "fuseflow-compiler/tests/kernels/nested_matmuls.mlir"
 DEFAULT_DATASET = "KarateClub"
 DEFAULT_INDATA = "User"  # Dummy value, always passed
 
@@ -114,7 +114,7 @@ def main():
     parser = argparse.ArgumentParser(description='Figure 17: Dataflow Order Sweep')
     parser.add_argument('--infile', type=str, default=DEFAULT_MLIR,
                         help='MLIR file to sweep dataflow orders on')
-    parser.add_argument('-b', '--build', type=str, default='samml/build',
+    parser.add_argument('-b', '--build', type=str, default='fuseflow-compiler/build',
                         help='Path to build directory')
     parser.add_argument('-sp', '--sparsity', type=float, default=0.9,
                         help='Sparsity level')

@@ -3,8 +3,8 @@ Repo for FuseFlow artifact generation
 
 ## Overview
 - Getting Started (5 human-minutes + 30 compute-minutes)
-- **Data Persistence Setup** - **CRITICAL: Read this to avoid data loss**
-- **Quick Start: Run All Benchmarks** (5 human-minutes + 96 compute-hours) - **Recommended for artifact reviewers**
+- Data Persistence Setup
+- Quick Start: Run All Benchmarks (5 human-minutes + 96 compute-hours)
 - Run Experiments:
     - Run Top-Level Script (5 human-minutes + 96 compute-hours)
     - Run Figure 12: Performance Comparison (5 human-minutes + up to 96 compute-hours)
@@ -30,16 +30,14 @@ This guide assumes the user has a working installation of Docker and some versio
 
 ## Data Persistence Setup
 
-**CRITICAL:** The default Docker workflow can cause data loss on system crashes or container restarts. Follow these steps to ensure your results are preserved:
-
-### Step 1: Create persistent storage directories on your host machine
+### Step 1: Create persistent storage directories
 ```bash
 mkdir -p ~/fuseflow_data/results
 mkdir -p ~/fuseflow_data/logs
 mkdir -p ~/fuseflow_data/checkpoints
 ```
 
-### Step 2: Run container with volume mounts (NO --rm flag!)
+### Step 2: Run container with volume mounts
 ```bash
 docker run -d -it \
   -v ~/fuseflow_data/results:/fuseflow-artifact/results \
@@ -49,36 +47,23 @@ docker run -d -it \
   fuseflow-artifact bash
 ```
 
-**Key changes from old approach:**
-- ✅ **Removed `--rm` flag** - Container persists after stopping
-- ✅ **Added volume mounts** - Data stored on host filesystem
-- ✅ **Named container** - Easy to restart with `docker start fuseflow-container`
-
 ### Step 3: Attach to the container
 ```bash
 docker attach fuseflow-container
 ```
 
-### Step 4: Exit safely without killing container
-- **IMPORTANT:** Do not type `exit` - this will kill the container
-- **Use `CTRL-p, CTRL-q`** to detach safely
-- Container keeps running in background
+### Step 4: Exit safely
+Use `CTRL-p, CTRL-q` to detach without killing the container.
 
-### Step 5: Reattach after system crash or logout
+### Step 5: Reattach after logout
 ```bash
 docker start fuseflow-container    # Start if stopped
 docker attach fuseflow-container   # Reattach to running container
 ```
 
-### What happens now when your system crashes?
-- ✅ All results, logs, and checkpoints are safe in `~/fuseflow_data/`
-- ✅ Container can be restarted with `docker start fuseflow-container`
-- ✅ No data loss from ephemeral container storage
-
 ## Quick Start: Run All Benchmarks (5 human-minutes + 96 compute-hours)
-For artifact reviewers who want to run all experiments with a single command:
 
-- Within the Docker container, run:
+Within the Docker container:
   ```
   ./scripts/run_all_benchmarks.sh 2>&1 | tee logs/run_all_benchmarks.log
   ```
@@ -105,11 +90,8 @@ For artifact reviewers who want to run all experiments with a single command:
   All PDFs and JSON files are now on your host filesystem.
 
 ## Run Top-Level Script (5 human-minutes + 96 compute-hours)
-We provide scripts to generate all of the results within the container.
 
-**IMPORTANT:** Always redirect output to log files to preserve results:
-
-- Within the Docker container, run the following commands to generate all results:
+Within the Docker container, run the following commands to generate all results:
   ```
   # Figure 12 - Main performance comparison (SAE, GCN, GraphSAGE, GPT-3)
   python3 scripts/run_figure12_benchmarks.py --mode complete 2>&1 | tee logs/figure12.log
@@ -130,12 +112,7 @@ We provide scripts to generate all of the results within the container.
   python3 scripts/run_figure17_sweep.py 2>&1 | tee logs/figure17.log
   ```
 
-- **Monitor from host machine:**
-  ```bash
-  tail -f ~/fuseflow_data/logs/figure12.log
-  ```
-
-- Once this completes, results are automatically saved to `~/fuseflow_data/results/` on your host machine.
+Results are saved to `~/fuseflow_data/results/` on your host machine.
 
 ## Run Figure 12: Performance Comparison (5 human-minutes + 96 compute-hours)
 Figure 12 compares performance across four model architectures (SAE, GCN, GraphSAGE, GPT-3).
@@ -288,7 +265,7 @@ Figure 17 evaluates different dataflow ordering strategies.
 
 ## Validate All Results
 
-Since you used volume mounts, all results are already on your host machine at `~/fuseflow_data/results/`. Simply view them directly:
+Results are on your host machine at `~/fuseflow_data/results/`:
 
 ```bash
 ls -lh ~/fuseflow_data/results/
@@ -316,33 +293,33 @@ open ~/fuseflow_data/results/figure12.pdf
 Please note that all active development beyond this paper is located in
 the main repositories and not this artifact repository.
 
-### The SAMML Compiler
-The SAMML compiler transforms high-level MLIR (Linalg + SparseTensor) to SAM dataflow programs.
-All compiler source files can be found in `/fuseflow-artifact/samml/`.
+### The FuseFlow Compiler
+The FuseFlow compiler transforms high-level MLIR (Linalg + SparseTensor) to SAM dataflow programs.
+All compiler source files can be found in `/fuseflow-artifact/fuseflow-compiler/`.
 
 To compile MLIR to SAM dataflow:
 ```
 cd /fuseflow-artifact
 
 # Compile MLIR to SAMML dialect
-./samml/build/tools/sam-opt --linalg-to-sam <input.mlir>
+./fuseflow-compiler/build/tools/sam-opt --linalg-to-sam <input.mlir>
 
 # Emit protobuf binary for simulator
-./samml/build/tools/sam-opt --linalg-to-sam <input.mlir> | \
-    ./samml/build/tools/sam-translate --emit-proto
+./fuseflow-compiler/build/tools/sam-opt --linalg-to-sam <input.mlir> | \
+    ./fuseflow-compiler/build/tools/sam-translate --emit-proto
 
 # With parallelization
-./samml/build/tools/sam-opt --linalg-to-sam \
+./fuseflow-compiler/build/tools/sam-opt --linalg-to-sam \
     "--stream-parallelizer=stream-level=0 par-factor=4" <input.mlir> | \
-    ./samml/build/tools/sam-translate --emit-proto
+    ./fuseflow-compiler/build/tools/sam-translate --emit-proto
 
 # With vectorization
-./samml/build/tools/sam-opt --linalg-to-sam \
+./fuseflow-compiler/build/tools/sam-opt --linalg-to-sam \
     "--stream-vectorizer=stream-shape=16" <input.mlir> | \
-    ./samml/build/tools/sam-translate --emit-proto
+    ./fuseflow-compiler/build/tools/sam-translate --emit-proto
 ```
 
-Use `./samml/build/tools/sam-opt --help` for specific instructions on compiler passes.
+Use `./fuseflow-compiler/build/tools/sam-opt --help` for specific instructions on compiler passes.
 
 ### The Comal Simulator
 The Comal simulator is a cycle-accurate dataflow simulator written in Rust with Python bindings.
@@ -360,15 +337,15 @@ For manual testing or debugging, use the end-to-end script directly:
 ```
 # GCN example
 python3 scripts/run_end_to_end.py \
-    --infile samml/tests/models/gcn_unfused/gcn_sparse.mlir \
-    --build samml/build \
+    --infile fuseflow-compiler/tests/models/gcn_unfused/gcn_sparse.mlir \
+    --build fuseflow-compiler/build \
     --sparsity 0.5 \
     --par 1
 
 # GPT-3 with BigBird example
 python3 scripts/run_end_to_end.py \
-    --infile samml/tests/models/gpt-3/outLinear_layernorm_FFN_layernorm_QKVprojection.mlir \
-    --build samml/build \
+    --infile fuseflow-compiler/tests/models/gpt-3/outLinear_layernorm_FFN_layernorm_QKVprojection.mlir \
+    --build fuseflow-compiler/build \
     --block 64 \
     --sparsity 0.9 \
     --outformat UNC
@@ -384,7 +361,7 @@ Source files can be found in `/fuseflow-artifact/tortilla-visualizer/`.
 The `run_figure12_benchmarks.py` script performs the following:
 
 1. For each model (SAE, GCN, GraphSAGE, GPT-3) and dataset:
-   - Compiles the MLIR representation using SAMML
+   - Compiles the MLIR representation using FuseFlow
    - Runs benchmark configurations
    - Collects cycle counts from the Comal simulator
 
@@ -459,7 +436,7 @@ The `plot_figure17.py` script generates visualizations showing impact of dataflo
 
 ```
 fuseflow-artifact/
-├── samml/               # SAMML compiler (MLIR-based)
+├── fuseflow-compiler/               # FuseFlow compiler (MLIR-based)
 │   ├── external/        # External dependencies (llvm-project, or-tools)
 │   ├── lib/             # Compiler library sources
 │   ├── tools/           # sam-opt, sam-translate binaries
@@ -503,8 +480,8 @@ fuseflow-artifact/
 ### Verifying Installation
 
 ```
-# Check SAMML compiler
-./samml/build/tools/sam-opt --help
+# Check FuseFlow compiler
+./fuseflow-compiler/build/tools/sam-opt --help
 
 # Check Comal Python bindings
 python3 -c "import comal; print('Comal OK')"

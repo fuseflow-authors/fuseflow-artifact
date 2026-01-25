@@ -42,7 +42,7 @@ def get_argparser():
                         help='The filename of the SparseTensor MLIR file to compile and simulate from PROJECT_DIR',
                         required=True)
     parser.add_argument('-b', '--build', type=str, default=None, help='Path to build directory. '
-                                                                'If not set, will use build/ in ARTIFACT_HOME/samml')
+                                                                'If not set, will use build/ in ARTIFACT_HOME/fuseflow-compiler')
     parser.add_argument('-d', '--debug', action='store_true', default=False,
                         help='Print out more information if in debug mode')
     parser.add_argument('--inDataset', '-inDataset', type=str, default="",
@@ -64,7 +64,7 @@ def get_argparser():
     return parser
 
 
-def run_samml_all(args):
+def run_fuseflow_all(args):
     result = dict()
     # Generate synthetic tensors
     
@@ -282,9 +282,6 @@ def run_samml_all(args):
     print("Simulation completed", sim_output)
     result["comal"] = sim_output
 
-    # TODO: gold check against scorch
-    #check_gold(test_name, matdir)
-
     if args.debug:
         print("Output dictionary:", result)
 
@@ -294,4 +291,4 @@ if __name__ == "__main__":
     print(sys.argv)
     parse = get_argparser()
     args = parse.parse_args()
-    run_samml_all(args)
+    run_fuseflow_all(args)

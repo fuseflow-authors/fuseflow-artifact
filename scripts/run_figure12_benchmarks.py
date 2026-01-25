@@ -741,7 +741,7 @@ def save_simulator_output(output_dir, model_name, dataset_name, fusion_type, op_
 
 def run_sae_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, output_dir=None, enable_hbm=True, workers=DEFAULT_WORKERS, cleanup_data=True):
     """Run Sparse Autoencoder benchmarks for all 3 datasets with parallel execution."""
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
 
     if datasets is None:
         datasets = list(SAE_CONFIG.keys())
@@ -858,7 +858,7 @@ def run_sae_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, o
 
 def run_gcn_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, output_dir=None, enable_hbm=True, workers=DEFAULT_WORKERS, cleanup_data=True):
     """Run GCN benchmarks for all 5 datasets with parallel execution."""
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
 
     if datasets is None:
         datasets = list(GCN_CONFIG.keys())
@@ -987,7 +987,7 @@ def run_gcn_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, o
 
 def run_graphsage_benchmarks(sparsity, build_dir, parfactor, timeout, datasets=None, output_dir=None, enable_hbm=True, workers=DEFAULT_WORKERS, cleanup_data=True):
     """Run GraphSAGE benchmarks for all 5 datasets with parallel execution."""
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
 
     if datasets is None:
         datasets = list(GRAPHSAGE_CONFIG.keys())
@@ -1145,7 +1145,7 @@ def run_gpt3_benchmarks(sparsity, build_dir, parfactor, timeout, block_sizes=Non
 
     Unfused = 18 individual operations (5 MHA ops with --useGen, 13 non-MHA ops)
     """
-    models_dir = ARTIFACT_ROOT / 'samml' / 'tests' / 'models'
+    models_dir = ARTIFACT_ROOT / 'fuseflow-compiler' / 'tests' / 'models'
 
     if block_sizes is None:
         block_sizes = list(GPT3_CONFIG.keys())
